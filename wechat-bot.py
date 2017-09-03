@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import shutil
 sys.defaultencoding = 'utf-8'
@@ -37,7 +38,7 @@ def setup_auto_reply(target_nickname):
         get_secret.secret = None
         def download_and_send_img(response, to_user_name):
             try:
-                img_result_url = response['url'].replace('m.image.so.com/i', 'm.image.so.com/j') + '&pn=50'
+                img_result_url = response['url'].replace('m.image.so.com/i', 'm.image.so.com/j') + '&pn=30'
                 print('img_result_url: ', img_result_url)
                 img_result_req = urllib.request.Request(url=img_result_url)
                 img_result_req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36')
@@ -50,29 +51,20 @@ def setup_auto_reply(target_nickname):
                     if len(img_url_list) == 0:
                         print('No image found!', img_url_list)
                         return '人工智障: 没有找到图片！'
-                    target_jpg_url = None
-                    target_gif_url = None
+                    img_url_list = [url['thumb'].replace('\/', '/') for url in img_url_list]
+                    target_urls = img_url_list[:2]
                     for img_url in img_url_list:
-                        if '.jpg' in img_url['thumb']:
-                            target_jpg_url = img_url['thumb'].replace('\/', '/')
-                        elif '.gif' in img_url['thumb']:
-                            target_gif_url = img_url['thumb'].replace('\/', '/')
-                        if (target_jpg_url is not None) and (target_gif_url is not None):
+                        if '.gif' in img_url:
+                            target_urls.append(img_url)
                             break
-                    print('target_jpg_url and target_gif_url: ', target_jpg_url, target_gif_url)
+                    print('target urls: ', target_urls)
 
                     def send_img_later(task):
                         filename = task['filename']
                         url = task['url']
                         urllib.request.urlretrieve(url, filename)
                         itchat.send_image(filename, toUserName=to_user_name)
-                    img_queue = []
-                    if target_jpg_url is not None:
-                        img_queue.append({ 'url': target_jpg_url,
-                            'filename': target_jpg_url[target_jpg_url.rfind('/') + 1:]})
-                    if target_gif_url is not None:
-                        img_queue.append({ 'url': target_gif_url,
-                            'filename': target_gif_url[target_gif_url.rfind('/') + 1:]})
+                    img_queue = [{ 'url': url, 'filename': url[url.rfind('/') + 1:]} for url in target_urls]
                     delay = 0.5
                     for task in img_queue:
                         threading.Timer(delay, send_img_later, args=[task]).start()
