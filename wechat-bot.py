@@ -6,7 +6,7 @@ import itchat
 import urllib
 import urllib.request
 import json
-from itchat.content import TEXT
+from itchat.content import TEXT, PICTURE
 import argparse
 import imghdr
 import threading
@@ -19,12 +19,13 @@ def setup_args():
 
 def setup_auto_reply(target_nickname):
     if target_nickname is not None:
-        target = username=itchat.search_friends(nickName=user)[0]
+        target = itchat.search_friends(nickName=user)[0]
         print('Auto reply to: ', target['NickName'], target['UserName'])
     else:
         target = None
         print('Auto reply to ALL')
 
+    @itchat.msg_register(PICTURE)
     @itchat.msg_register(TEXT)
     def auto_reply(msg):
         def get_secret():
@@ -73,11 +74,14 @@ def setup_auto_reply(target_nickname):
                 print('Error when downloading img', e)
                 return '人工智障: 下载图片时发生错误！'
 
+        print('Received message from and type: ', msg['FromUserName'], msg['MsgType'])
         if (target is not None) and (msg['FromUserName'] != target['UserName']):
             return
         secret = get_secret()
         if secret is None:
             return
+        if msg['MsgType'] == 3:
+            msg['Content'] = '给我可爱小动物图片'
         request_data = bytes('{{"key": "{}", "userid": 1, "info": "{}"}}'
             .format(secret, msg['Content']), 'utf-8')
         req = urllib.request.Request(url='http://www.tuling123.com/openapi/api', data=request_data, method='POST')
@@ -93,9 +97,6 @@ def setup_auto_reply(target_nickname):
                 if msg is not None:
                     return msg
             return '人工智障: ' + response['text']
-
-def logout_callback():
-    print('Logging out...')
 
 def main():
     args = setup_args()
