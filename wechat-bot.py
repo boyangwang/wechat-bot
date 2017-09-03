@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import shutil
 sys.defaultencoding = 'utf-8'
@@ -38,38 +39,41 @@ def setup_auto_reply(target_nickname):
                 print('You don\'t have a secret.txt file!', e)
         get_secret.secret = None
         def download_and_send_img(response, to_user_name):
+            if not os.path.exists('./imgs'):
+                os.makedirs('./imgs')
             try:
                 img_result_url = response['url'].replace('m.image.so.com/i', 'm.image.so.com/j') + '&pn=30'
                 print('img_result_url: ', img_result_url)
+                itchat.send_msg('人工智障: 亲，已帮你找到图片，正在下载。如果我卡壳了，就再换一个图片要求发给我试试吧。',
+                    toUserName=to_user_name)
                 img_result_req = urllib.request.Request(url=img_result_url)
                 img_result_req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36')
-                img_result_req.add_header('Cookie', 'PHPSESSID=s8lhq62rai0sr352ci6ps8uis2; __guid=100021698.309740684622375200.1504443870366.3638; count=2')
                 img_result_req.add_header('Host', 'm.image.so.com')
-                with urllib.request.urlopen(img_result_req) as img_f:
-                    img_result = json.load(img_f)
-                    print('img_result: ', img_result)
-                    img_url_list = img_result['list']
-                    if len(img_url_list) == 0:
-                        print('No image found!', img_url_list)
-                        return '人工智障: 没有找到图片！'
-                    img_url_list = [url['thumb'].replace('\/', '/') for url in img_url_list]
-                    target_urls = img_url_list[:2]
-                    for img_url in img_url_list:
-                        if '.gif' in img_url:
-                            target_urls.append(img_url)
-                            break
-                    print('target urls: ', target_urls)
+                img_f = urllib.request.urlopen(img_result_req, timeout=12)
+                img_result = json.load(img_f)
+                print('img_result: ', img_result)
+                img_url_list = img_result['list']
+                if len(img_url_list) == 0:
+                    print('No image found!', img_url_list)
+                    return '人工智障: 没有找到图片！'
+                img_url_list = [url['thumb'].replace('\/', '/') for url in img_url_list]
+                target_urls = img_url_list[:2]
+                for img_url in img_url_list:
+                    if '.gif' in img_url:
+                        target_urls.append(img_url)
+                        break
+                print('target urls: ', target_urls)
 
-                    def send_img_later(task):
-                        filename = task['filename']
-                        url = task['url']
-                        urllib.request.urlretrieve(url, filename)
-                        itchat.send_image(filename, toUserName=to_user_name)
-                    img_queue = [{ 'url': url, 'filename': url[url.rfind('/') + 1:]} for url in target_urls]
-                    delay = 0.5
-                    for task in img_queue:
-                        threading.Timer(delay, send_img_later, args=[task]).start()
-                        delay += 2
+                def send_img_later(task):
+                    filename = task['filename']
+                    url = task['url']
+                    urllib.request.urlretrieve(url, './imgs/'+filename)
+                    itchat.send_image('./imgs/'+filename, toUserName=to_user_name)
+                img_queue = [{ 'url': url, 'filename': url[url.rfind('/') + 1:]} for url in target_urls]
+                delay = 0.5
+                for task in img_queue:
+                    threading.Timer(delay, send_img_later, args=[task]).start()
+                    delay += 2
             except Exception as e:
                 print('Error when downloading img', e)
                 return '人工智障: 下载图片时发生错误！'
@@ -86,17 +90,18 @@ def setup_auto_reply(target_nickname):
             .format(secret, msg['Content']), 'utf-8')
         req = urllib.request.Request(url='http://www.tuling123.com/openapi/api', data=request_data, method='POST')
         req.add_header('Content-Type', 'application/json')
-        with urllib.request.urlopen(req) as f:
+        try:
+            f = urllib.request.urlopen(req, timeout=10)
             response = json.load(f)
             print('Loaded response: ', response)
             if response['code'] in range(40000, 49999):
                 print('Response returned error: ', response)
                 return
             if response['code'] == 200000:
-                msg = download_and_send_img(response, msg['FromUserName'])
-                if msg is not None:
-                    return msg
+                return download_and_send_img(response, msg['FromUserName'])
             return '人工智障: ' + response['text']
+        except:
+            return '人工智障: 我卡壳了，再跟我说别的试试'
 
 def main():
     args = setup_args()
