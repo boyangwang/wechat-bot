@@ -77,8 +77,15 @@ def setup_auto_reply(target_nickname):
             except Exception as e:
                 print('Error when downloading img', e)
                 return '人工智障: 下载图片时发生错误！'
+        def send_news(response, to_user_name):
+            msg = '人工智障: '+response['text']+'\n\n'
+            for item in response['list']:
+                if ('article' in item) and item['article'] != '':
+                    msg += '标题: '+item['article']+'\n链接: '+item['detailurl']+'\n\n'
+            return msg
 
         print('Received message from and type: ', msg['FromUserName'], msg['MsgType'])
+        itchat.send_msg('人工智障: 收到，您稍等我反应慢...', toUserName=msg['FromUserName'])
         if (target is not None) and (msg['FromUserName'] != target['UserName']):
             return
         secret = get_secret()
@@ -97,8 +104,10 @@ def setup_auto_reply(target_nickname):
             if response['code'] in range(40000, 49999):
                 print('Response returned error: ', response)
                 return
-            if response['code'] == 200000:
+            elif response['code'] == 200000:
                 return download_and_send_img(response, msg['FromUserName'])
+            elif response['code'] == 302000:
+                return send_news(response, msg['FromUserName'])
             return '人工智障: ' + response['text']
         except:
             return '人工智障: 我卡壳了，再跟我说别的试试'
