@@ -2,3 +2,7 @@
 itchat.pkl
 node_modules
 secret.txt
+*.gif
+*.jpg
+*.bmp
+*.png
