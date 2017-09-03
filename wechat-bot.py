@@ -76,7 +76,7 @@ def setup_auto_reply(target_nickname):
                     delay = 0.5
                     for task in img_queue:
                         threading.Timer(delay, send_img_later, args=[task]).start()
-                        delay += 0.5
+                        delay += 2
             except Exception as e:
                 print('Error when downloading img', e)
                 return '人工智障: 下载图片时发生错误！'
@@ -107,7 +107,7 @@ def logout_callback():
 
 def main():
     args = setup_args()
-    itchat.auto_login(hotReload=True, enableCmdQR=True, exitCallback=logout_callback)
+    itchat.auto_login(hotReload=True, enableCmdQR=True)
     setup_auto_reply(args.target_nickname)
     itchat.run()
 
