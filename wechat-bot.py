@@ -11,13 +11,29 @@ from itchat.content import TEXT, PICTURE
 import argparse
 import imghdr
 import threading
+from datetime import datetime
+from datetime import timedelta
 
 def setup_args():
     parser = argparse.ArgumentParser(description='WeChat bot')
     parser.add_argument('-n', '--target-nickname', metavar='target-nickname',
         help='the contact\'s nickname that you want to auto-reply to')
     return parser.parse_args()
-
+def get_secret():
+    if get_secret.secret is not None:
+        return get_secret.secret
+    try:
+        get_secret.secret = open('secret.txt', 'r').read()
+        return get_secret.secret
+    except Exception as e:
+        print('You don\'t have a secret.txt file!', e)
+get_secret.secret = None
+def create_news_response_msg(response):
+    msg = '人工智障: '+response['text']+'\n\n'
+    for item in response['list']:
+        if ('article' in item) and item['article'] != '':
+            msg += '标题: '+item['article']+'\n链接: '+item['detailurl']+'\n\n'
+    return msg
 def setup_auto_reply(target_nickname):
     if target_nickname is not None:
         target = itchat.search_friends(nickName=user)[0]
@@ -29,15 +45,6 @@ def setup_auto_reply(target_nickname):
     @itchat.msg_register(PICTURE)
     @itchat.msg_register(TEXT)
     def auto_reply(msg):
-        def get_secret():
-            if get_secret.secret is not None:
-                return get_secret.secret
-            try:
-                get_secret.secret = open('secret.txt', 'r').read()
-                return get_secret.secret
-            except Exception as e:
-                print('You don\'t have a secret.txt file!', e)
-        get_secret.secret = None
         def download_and_send_img(response, to_user_name):
             if not os.path.exists('./imgs'):
                 os.makedirs('./imgs')
@@ -77,12 +84,6 @@ def setup_auto_reply(target_nickname):
             except Exception as e:
                 print('Error when downloading img', e)
                 return '人工智障: 下载图片时发生错误！'
-        def send_news(response, to_user_name):
-            msg = '人工智障: '+response['text']+'\n\n'
-            for item in response['list']:
-                if ('article' in item) and item['article'] != '':
-                    msg += '标题: '+item['article']+'\n链接: '+item['detailurl']+'\n\n'
-            return msg
 
         print('Received message from and type: ', msg['FromUserName'], msg['MsgType'])
         itchat.send_msg('人工智障: 收到，您稍等我反应慢...', toUserName=msg['FromUserName'])
@@ -107,15 +108,49 @@ def setup_auto_reply(target_nickname):
             elif response['code'] == 200000:
                 return download_and_send_img(response, msg['FromUserName'])
             elif response['code'] == 302000:
-                return send_news(response, msg['FromUserName'])
+                return create_news_response_msg(response)
             return '人工智障: ' + response['text']
         except:
             return '人工智障: 我卡壳了，再跟我说别的试试'
+def setup_daily_news():
+    secret = get_secret()
+    if secret is None:
+        return
+    def get_next_delta_t():
+        now_time = datetime.today()
+        next_time = (now_time + timedelta(days=0)).replace(hour=10, minute=30, second=0)
+        return (next_time - now_time).seconds + 1
+    def send_daily_news():
+        friend = itchat.search_friends(nickName='Boyang')[0]
+        # for friend in itchat.get_friends(update=True):
+        itchat.send_msg('人工智障: 我要给你发新闻了，回复TD退订...', toUserName=friend['UserName'])
+        request_data = bytes('{{"key": "{}", "userid": 1, "info": "{}"}}'
+            .format(secret, '给我发新闻'), 'utf-8')
+        req = urllib.request.Request(url='http://www.tuling123.com/openapi/api', data=request_data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        try:
+            f = urllib.request.urlopen(req, timeout=30)
+            response = json.load(f)
+            print('Loaded response: ', response)
+            if response['code'] in range(40000, 49999):
+                print('Response returned error: ', response)
+                itchat.send_msg('人工智障: 我卡壳了，今儿算了', toUserName=friend['UserName'])
+            elif response['code'] == 302000:
+                itchat.send_msg(create_news_response_msg(response), toUserName=friend['UserName'])
+            else:
+                itchat.send_msg('人工智障: ' + response['text'], toUserName=friend['UserName'])
+        except Exception as e:
+            print('Err when sending news: ', e)
+            itchat.send_msg('人工智障: 我卡壳了，今儿算了', toUserName=friend['UserName'])
+        threading.Timer(get_next_delta_t(), send_daily_news)
+    print('Setting up daily news, now datetime: ', str(datetime.today()))
+    threading.Timer(get_next_delta_t(), send_daily_news).start()
 
 def main():
     args = setup_args()
     itchat.auto_login(hotReload=True, enableCmdQR=True)
     setup_auto_reply(args.target_nickname)
+    setup_daily_news()
     itchat.run()
 
 main()
