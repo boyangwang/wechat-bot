@@ -44,6 +44,50 @@ def create_news_response_msg(response):
     return msg
 
 
+def download_and_send_img(response, to_user_name):
+    def send_img_later(task):
+        filename = task['filename']
+        url = task['url']
+        urllib.request.urlretrieve(url, './imgs/' + filename)
+        itchat.send_image('./imgs/' + filename, toUserName=to_user_name)
+    if not os.path.exists('./imgs'):
+        os.makedirs('./imgs')
+    try:
+        img_result_url = response['url'].replace(
+            'm.image.so.com/i', 'm.image.so.com/j') + '&pn=30'
+        print('img_result_url: ', img_result_url)
+        itchat.send_msg('人工智障: 亲，已帮你找到图片，正在下载。如果我卡壳了，就再换一个图片要求发给我试试吧。',
+                        toUserName=to_user_name)
+        img_result_req = urllib.request.Request(url=img_result_url)
+        img_result_req.add_header(
+            'User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36')
+        img_result_req.add_header('Host', 'm.image.so.com')
+        img_f = urllib.request.urlopen(img_result_req, timeout=12)
+        img_result = json.load(img_f)
+        print('img_result: ', img_result)
+        img_url_list = img_result['list']
+        if len(img_url_list) == 0:
+            print('No image found!', img_url_list)
+            return '人工智障: 没有找到图片！'
+        img_url_list = [url['thumb'].replace(
+            '\/', '/') for url in img_url_list]
+        target_urls = img_url_list[:2]
+        for img_url in img_url_list:
+            if '.gif' in img_url:
+                target_urls.append(img_url)
+                break
+        print('target urls: ', target_urls)
+        img_queue = [
+            {'url': url, 'filename': url[url.rfind('/') + 1:]} for url in target_urls]
+        delay = 0.5
+        for task in img_queue:
+            threading.Timer(delay, send_img_later, args=[task]).start()
+            delay += 2
+    except Exception as e:
+        print('Error when downloading img', e)
+        return '人工智障: 下载图片时发生错误！'
+
+
 def setup_auto_reply(target_nickname):
     if target_nickname is not None:
         target = itchat.search_friends(nickName=user)[0]
@@ -55,51 +99,6 @@ def setup_auto_reply(target_nickname):
     @itchat.msg_register(PICTURE)
     @itchat.msg_register(TEXT)
     def auto_reply(msg):
-        def download_and_send_img(response, to_user_name):
-            if not os.path.exists('./imgs'):
-                os.makedirs('./imgs')
-            try:
-                img_result_url = response['url'].replace(
-                    'm.image.so.com/i', 'm.image.so.com/j') + '&pn=30'
-                print('img_result_url: ', img_result_url)
-                itchat.send_msg('人工智障: 亲，已帮你找到图片，正在下载。如果我卡壳了，就再换一个图片要求发给我试试吧。',
-                                toUserName=to_user_name)
-                img_result_req = urllib.request.Request(url=img_result_url)
-                img_result_req.add_header(
-                    'User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36')
-                img_result_req.add_header('Host', 'm.image.so.com')
-                img_f = urllib.request.urlopen(img_result_req, timeout=12)
-                img_result = json.load(img_f)
-                print('img_result: ', img_result)
-                img_url_list = img_result['list']
-                if len(img_url_list) == 0:
-                    print('No image found!', img_url_list)
-                    return '人工智障: 没有找到图片！'
-                img_url_list = [url['thumb'].replace(
-                    '\/', '/') for url in img_url_list]
-                target_urls = img_url_list[:2]
-                for img_url in img_url_list:
-                    if '.gif' in img_url:
-                        target_urls.append(img_url)
-                        break
-                print('target urls: ', target_urls)
-
-                def send_img_later(task):
-                    filename = task['filename']
-                    url = task['url']
-                    urllib.request.urlretrieve(url, './imgs/' + filename)
-                    itchat.send_image('./imgs/' + filename,
-                                      toUserName=to_user_name)
-                img_queue = [
-                    {'url': url, 'filename': url[url.rfind('/') + 1:]} for url in target_urls]
-                delay = 0.5
-                for task in img_queue:
-                    threading.Timer(delay, send_img_later, args=[task]).start()
-                    delay += 2
-            except Exception as e:
-                print('Error when downloading img', e)
-                return '人工智障: 下载图片时发生错误！'
-
         print('Received message from and type: ',
               msg['FromUserName'], msg['MsgType'])
         itchat.send_msg('人工智障: 收到，您稍等我反应慢...', toUserName=msg['FromUserName'])
@@ -126,12 +125,10 @@ def setup_auto_reply(target_nickname):
             elif response['code'] == 200000:
                 if '找到图片' in response['text']:
                     return download_and_send_img(response, msg['FromUserName'])
-                elif '菜谱信息' in response['text']:
-                    return create_recipe_response(response)
                 else:
                     msg = '人工智障: {}\n'.format(response['text'])
                     if 'url' in response:
-                        msg = (msg+'URL: {}').format(response['url'])
+                        msg = (msg + 'URL: {}').format(response['url'])
                     return msg
             elif response['code'] == 302000:
                 return create_news_response_msg(response)
