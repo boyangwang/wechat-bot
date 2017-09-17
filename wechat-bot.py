@@ -117,7 +117,9 @@ def setup_auto_reply(target_nickname):
         req.add_header('Content-Type', 'application/json')
         try:
             f = urllib.request.urlopen(req, timeout=10)
-            response = json.load(f)
+            import codecs
+            reader = codecs.getread("utf-8")
+            response = json.load(reader(f))
             print('Loaded response: ', response)
             if response['code'] in range(40000, 49999):
                 print('Response returned error: ', response)
@@ -183,7 +185,7 @@ def setup_daily_news():
 
 def main():
     args = setup_args()
-    itchat.auto_login(hotReload=True, enableCmdQR=True)
+    itchat.auto_login(hotReload=True)
     setup_auto_reply(args.target_nickname)
     # setup_daily_news()
     itchat.run()
