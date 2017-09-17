@@ -14,7 +14,6 @@ import threading
 from datetime import datetime
 from datetime import timedelta
 
-
 def setup_args():
     parser = argparse.ArgumentParser(description='WeChat bot')
     parser.add_argument('-n', '--target-nickname', metavar='target-nickname',
@@ -99,11 +98,26 @@ def setup_auto_reply(target_nickname):
     @itchat.msg_register(PICTURE)
     @itchat.msg_register(TEXT)
     def auto_reply(msg):
+        global should_reply
         print('Received message from and type: ',
               msg['FromUserName'], msg['MsgType'])
         itchat.send_msg('人工智障: 收到，您稍等我反应慢...', toUserName=msg['FromUserName'])
         if (target is not None) and (msg['FromUserName'] != target['UserName']):
             return
+        
+        if msg['Content'] == 'open':
+            print('in open')
+            should_reply = True
+            return
+        elif msg['Content'] == 'close':
+            print('in close')
+            should_reply = False
+            return
+        
+        if not should_reply:
+            print('not should reply')
+            return
+
         secret = get_secret()
         if secret is None:
             return
@@ -138,7 +152,6 @@ def setup_auto_reply(target_nickname):
         except Exception as e:
             print('Err: ', e)
             return '人工智障: 我卡壳了，再跟我说别的试试'
-
 
 def setup_daily_news():
     secret = get_secret()
