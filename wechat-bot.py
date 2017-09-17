@@ -118,7 +118,7 @@ def setup_auto_reply(target_nickname):
         try:
             f = urllib.request.urlopen(req, timeout=10)
             import codecs
-            reader = codecs.getread("utf-8")
+            reader = codecs.getreader("utf-8")
             response = json.load(reader(f))
             print('Loaded response: ', response)
             if response['code'] in range(40000, 49999):
